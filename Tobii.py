@@ -129,6 +129,21 @@ class Tobii:
         #left_gaze = gaze_data['left_gaze_point_on_display_area']
         #right_gaze = gaze_data['right_gaze_point_on_display_area']
     
+    def add_marker(self, marker):
+
+        """
+        Add a custom marker to the gaze data
+        
+        Args:
+        - marker_type (str): Type of marker (e.g., 'STIMULUS_START', 'STIMULUS_END')
+        """
+        marker_data = {
+            'type': 'marker',
+            'marker_type': marker,
+            'system_timestamp': time.time()
+        }
+        self.gaze_data.append(marker_data)
+    
     def start_recording(self):
 
         if self.my_eyetracker is None:
