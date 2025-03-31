@@ -38,9 +38,26 @@ class Webcam():
             'right_eye_x': [],
             'right_eye_y': [],
             'left_eye_x': [],
-            'left_eye_y': []
-            }                    #(t, x,y)
+            'left_eye_y': [],
+            'marker': []
+            }                    #(t,x,y)
         self._running = False
+    
+    def add_marker(self, marker_type):
+        """
+        Add a custom marker to the gaze data
+        
+        Args:
+        - marker_type (str): Type of marker (e.g., 'STIMULUS_START', 'STIMULUS_END')
+        """
+        now = time.time()
+        self.gaze_data['timestamps'].append(now)
+        self.gaze_data['right_eye_x'].append(None)
+        self.gaze_data['right_eye_y'].append(None)
+        self.gaze_data['left_eye_x'].append(None)
+        self.gaze_data['left_eye_y'].append(None)
+        self.gaze_data['markers'].append(marker_type)
+    
     
     def start_recording_webcam(self):
         """Starts the webcam and MediaPipe."""
@@ -93,9 +110,10 @@ class Webcam():
                     self.gaze_data['right_eye_y'].append(ry)
                     self.gaze_data['left_eye_x'].append(lx)
                     self.gaze_data['left_eye_y'].append(ly)
+                    self.gaze_data['markers'].append(None)
 
             cv2.imshow('MediaPipe FaceMesh', frame)
-            if cv2.waitKey(0) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
         #Cleanup
@@ -103,6 +121,17 @@ class Webcam():
         self.cap.release()
         cv2.destroyAllWindows()
         print("[Webcam] Capture stopped.")
+    
+    def stop_recording(self):
+        """Stops the capture loop from code (no 'q' key required)."""
+        if self._running:
+            print("[Webcam] Stopping capture...")
+            self._running = False
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.release()
+            cv2.destroyAllWindows()
+            print("[Webcam] Capture stopped.")
+        
 
     def get_data(self):
         """Returns the gaze data."""
@@ -138,6 +167,12 @@ class Webcam():
         plt.tight_layout()
         plt.show()
     
+
+
+
+
+
+
 
 
 
