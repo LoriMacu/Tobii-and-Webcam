@@ -39,7 +39,7 @@ class Webcam():
             'right_eye_y': [],
             'left_eye_x': [],
             'left_eye_y': [],
-            'marker': []
+            'markers': []  # Changed from 'marker' to 'markers'
             }                    #(t,x,y)
         self._running = False
     
@@ -61,66 +61,87 @@ class Webcam():
     
     def start_recording_webcam(self):
         """Starts the webcam and MediaPipe."""
-        self.cap = cv2.VideoCapture(self.cam_index)
-
-        if not self.cap.isOpened():
-            print("Error: Could not open webcam.")
-            return False
-
-        self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
-                         max_num_faces=1,
-                         min_detection_confidence=0.5,
-                         min_tracking_confidence=0.5,
-                         refine_landmarks=True)
-        print("[Webcam] Starting capture... Press 'q' to quit.")
-        self._running = True
-
-        while self._running:
-            ret, frame = self.cap.read()
-            if not ret:
-                print("Error: Could not read frame from webcam.")
-                break
-
-            frame = cv2.flip(frame, 1)
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.face_mesh.process(frame_rgb)
-
-            now = time.time()
-
-            if results.multi_face_landmarks:
-                for face_landmarks in results.multi_face_landmarks:
-                    mp_drawing.draw_landmarks(
-                    image=frame,
-                    landmark_list=face_landmarks,
-                    connections=mp_face_mesh.FACEMESH_TESSELATION,
-                    landmark_drawing_spec=drawing_spec,
-                    connection_drawing_spec=drawing_spec
-                )
-
-                    # Extract eye position
-                    rx = face_landmarks.landmark[473].x * self.frame_width
-                    ry = face_landmarks.landmark[473].y * self.frame_height
-                    lx = face_landmarks.landmark[468].x * self.frame_width
-                    ly = face_landmarks.landmark[468].y * self.frame_height
-
-                    self.gaze_data['timestamps'].append(now)
-                    self.gaze_data['right_eye_x'].append(rx)
-                    self.gaze_data['right_eye_y'].append(ry)
-                    self.gaze_data['left_eye_x'].append(lx)
-                    self.gaze_data['left_eye_y'].append(ly)
-                    self.gaze_data['markers'].append(None)
-
-            cv2.imshow('MediaPipe FaceMesh', frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        #Cleanup
-        self._running = False
-        self.cap.release()
-        cv2.destroyAllWindows()
-        print("[Webcam] Capture stopped.")
+        try:
+            self.cap = cv2.VideoCapture(self.cam_index)
+        
+            if not self.cap.isOpened():
+                print("Error: Could not open webcam.")
+                return False
+        
+            self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.face_mesh = self.mp_face_mesh.FaceMesh(
+                             max_num_faces=1,
+                             min_detection_confidence=0.5,
+                             min_tracking_confidence=0.5,
+                             refine_landmarks=True)
+            print("[Webcam] Starting capture... Press 'q' to quit.")
+            self._running = True
+            
+            # Create window with a specific name and make it non-fullscreen
+            cv2.namedWindow('MediaPipe FaceMesh', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('MediaPipe FaceMesh', 640, 480)  # Smaller window size
+        
+            # Process frames as long as _running is True
+            while self._running:
+                try:
+                    ret, frame = self.cap.read()
+                    if not ret:
+                        print("Error: Could not read frame from webcam.")
+                        time.sleep(0.1)  # Small delay before retrying
+                        continue
+                
+                    # Process the frame
+                    frame = cv2.flip(frame, 1)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    results = self.face_mesh.process(frame_rgb)
+                
+                    now = time.time()
+                
+                    if results.multi_face_landmarks:
+                        for face_landmarks in results.multi_face_landmarks:
+                            self.mp_drawing.draw_landmarks(
+                                image=frame,
+                                landmark_list=face_landmarks,
+                                connections=self.mp_face_mesh.FACEMESH_TESSELATION,
+                                landmark_drawing_spec=self.drawing_spec,
+                                connection_drawing_spec=self.drawing_spec
+                            )
+            
+                            # Extract eye position
+                            rx = face_landmarks.landmark[473].x * self.frame_width
+                            ry = face_landmarks.landmark[473].y * self.frame_height
+                            lx = face_landmarks.landmark[468].x * self.frame_width
+                            ly = face_landmarks.landmark[468].y * self.frame_height
+            
+                            self.gaze_data['timestamps'].append(now)
+                            self.gaze_data['right_eye_x'].append(rx)
+                            self.gaze_data['right_eye_y'].append(ry)
+                            self.gaze_data['left_eye_x'].append(lx)
+                            self.gaze_data['left_eye_y'].append(ly)
+                            self.gaze_data['markers'].append(None)
+                
+                    if self.show_preview:
+                        cv2.imshow('MediaPipe FaceMesh', frame)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
+                        break
+                except Exception as e:
+                    print(f"[Webcam] Error processing frame: {e}")
+                    time.sleep(0.1)  # Small delay before continuing
+        
+            #Cleanup
+            self._running = False
+            if self.cap is not None and self.cap.isOpened():
+                self.cap.release()
+            cv2.destroyAllWindows()
+            print("[Webcam] Capture stopped.")
+        except Exception as e:
+            print(f"[Webcam] Critical error in webcam recording: {e}")
+            self._running = False
+            if hasattr(self, 'cap') and self.cap is not None and self.cap.isOpened():
+                self.cap.release()
+            cv2.destroyAllWindows()
     
     def stop_recording(self):
         """Stops the capture loop from code (no 'q' key required)."""
@@ -166,13 +187,18 @@ class Webcam():
 
         plt.tight_layout()
         plt.show()
+
+
+if __name__ == "__main__":
+
+    webcam = Webcam()
+    webcam.start_recording_webcam()
+    #webcam.plot_eye_positions()
+ 
+
+
+   
     
-
-
-
-
-
-
 
 
 
