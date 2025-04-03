@@ -1,6 +1,6 @@
-
 import cv2
 import numpy as np
+import time
 
 class Stimulus:
 
@@ -46,8 +46,8 @@ class Stimulus:
         screen = np.full((self.screen_height, self.screen_width, 3), 255, dtype=np.uint8)
 
         # Draw stimulus point (red circle)
-        point_x = self.screen_center_x + offset_pixel
-        point_y = self.screen_center_y
+        point_x = self.screen_width_center + offset_pixel
+        point_y = self.screen_height_center
         cv2.circle(screen, (point_x, point_y), 20, (0, 0, 255), -1)
         
         return screen
@@ -57,33 +57,51 @@ class Stimulus:
         Loop through the stimulus points and display them on the screen.
         Start with a key press to start the loop.
         It returns the stimulus_data dictionary when the loop is done.
-
         """
-
-        welcome_screen = np.full((self.screen_height, self.screen_width, 3), 255, dtype=np.uint8)
-        welcome_text = "Press c to start the stimulus presentation"
-        cv2.putText(welcome_screen, 
-                    welcome_text, 
-                    (self.screen_width//4, self.screen_height//2),  #Position of the text
-                    cv2.FONT_HERSHEY_SIMPLEX, 
-                    1.5, (0, 0, 0), 3)
-        
-        cv2.imshow('Stimulus Presentation', welcome_screen)
-
-        while True:
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('c'):
-                break
-
+    
+        # Make sure we're the only window by destroying any existing ones
         cv2.destroyAllWindows()
-
-        #Stimulus presentation loop
-
-        cv2.namedWindow('Stimulus Presentation', cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty('Stimulus Presentation', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         
-        for _ in range(num_sequence):
-            for offset_cm, offset_pixel in zip(self.offset_cm, self.offset_pixel): #zip() allows us to iterate over two lists simultaneously:
+        # Create welcome screen with better error handling
+        try:
+            welcome_screen = np.full((self.screen_height, self.screen_width, 3), 255, dtype=np.uint8)
+            welcome_text = "Press c to start the stimulus presentation"
+            cv2.putText(welcome_screen, 
+                        welcome_text, 
+                        (self.screen_width//4, self.screen_height//2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        1.5, (0, 0, 0), 3)
+            
+            # Create window and set it to be topmost
+            cv2.namedWindow('Stimulus Presentation', cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty('Stimulus Presentation', cv2.WND_PROP_TOPMOST, 1)
+            cv2.imshow('Stimulus Presentation', welcome_screen)
+            print("[Stimulus] Welcome screen displayed. Press 'c' to start.")
+    
+            # Wait for key press with timeout
+            start_time = time.time()
+            while True:
+                key = cv2.waitKey(100) & 0xFF  # Check every 100ms instead of 1ms
+                if key == ord('c'):
+                    print("[Stimulus] 'c' key pressed, starting presentation.")
+                    break
+                if key == ord('q'):
+                    print("[Stimulus] 'q' key pressed, exiting.")
+                    cv2.destroyAllWindows()
+                    return self.stimulus_data
+                # Add timeout option (30 seconds)
+                if time.time() - start_time > 30:
+                    print("[Stimulus] Timeout waiting for key press. Starting automatically.")
+                    break
+        
+            # Stimulus presentation loop - recreate window to ensure it's on top
+            cv2.destroyAllWindows()
+            cv2.namedWindow('Stimulus Presentation', cv2.WINDOW_NORMAL)
+            cv2.setWindowProperty('Stimulus Presentation', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            cv2.setWindowProperty('Stimulus Presentation', cv2.WND_PROP_TOPMOST, 1)
+            
+            for _ in range(num_sequence):
+                for offset_cm, offset_pixel in zip(self.offset_cm, self.offset_pixel): #zip() allows us to iterate over two lists simultaneously:
 
                 stimulus_screen = self.create_stimulus_screen(offset_pixel)
                 cv2.imshow('Stimulus Presentation', stimulus_screen)
